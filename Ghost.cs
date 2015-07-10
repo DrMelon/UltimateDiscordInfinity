@@ -10,6 +10,8 @@ namespace CaffieneJam
     {
         public Spritemap<string> mySprite;
 
+        public bool Impostor = false;
+
         public bool isDistorting = false;
         public float aliveTime;
         public float hurtTime = 0.0f;
@@ -19,10 +21,13 @@ namespace CaffieneJam
         public float MaxRefire = 5.0f;
         public float RefireTime = 0.0f;
 
-        public Ghost(float x, float y)
+        public ControllerXbox360 myController;
+
+        public Ghost(float x, float y, bool impostor)
         {
             X = x;
             Y = y;
+            Impostor = impostor;
 
             mySprite = new Spritemap<string>(Assets.GFX_GHOST_SHEET, 22, 20);
             mySprite.Add("idle", new int[] { 0, 1, 2, 3 }, new float[] { 8f });
@@ -44,6 +49,11 @@ namespace CaffieneJam
             Collider.CenterOrigin();
             Layer = 5;
 
+            if(!impostor)
+            {
+                myController = Global.theController;
+            }
+            
         }
 
         public override void UpdateFirst()
@@ -68,21 +78,110 @@ namespace CaffieneJam
 
         }
 
+        public void HandleInput()
+        {
+            Vector2 moveDelta = new Vector2();
+            moveDelta.X = myController.LeftStick.X * 0.1f;
+            moveDelta.Y = myController.LeftStick.Y * 0.1f;
+
+            MoveInDirection(moveDelta);
+
+            Vector2 shootAxis = new Vector2();
+            shootAxis.X = myController.RightStick.X;
+            shootAxis.Y = myController.RightStick.Y;
+
+            ShootInDirection(shootAxis);
+
+            if ((myController.B.Pressed && Global.Bombs > 0))
+            {
+                DropBombs();
+            }
+
+
+        }
+
+        public void HandleImpostorInput()
+        {
+            Vector2 impostorMove = new Vector2(X, Y);
+            impostorMove -= new Vector2(Global.theGhost.X + (float)Math.Sin(Y * X) * 50, Global.theGhost.Y + (float)Math.Sin(Y * X*X) * 50);
+            impostorMove.Normalize();
+            MoveInDirection(-impostorMove);
+
+            ShootInDirection(impostorMove);
+
+        }
+
+        public void MoveInDirection(Vector2 moveDelta)
+        {
+            mySpeed.X += moveDelta.X;
+            mySpeed.Y += moveDelta.Y;
+
+            mySpeed.Max = (Global.Score / 50) * 1.0f;
+
+            if (Math.Abs(moveDelta.X) <= 0.1)
+            {
+                mySpeed.X *= 0.95f;
+               
+            }
+            if(Math.Abs(moveDelta.Y) <= 0.1)
+            {
+                mySpeed.Y *= 0.95f;
+            }
+
+
+        }
+
+        public void ShootInDirection(Vector2 shootAxis)
+        {
+            // Shoot stars
+            if ((shootAxis.Length > 0.9) && RefireTime <= 0.0 && hurtTime <= 0.0)
+            {
+                RefireTime = MaxRefire;
+
+
+                float XSpeedOfStar = 4.0f * shootAxis.X;
+                float YSpeedOfStar = 4.0f * shootAxis.Y;
+
+                Star newStar = new Star(X, Y, XSpeedOfStar, YSpeedOfStar);
+                this.Scene.Add(newStar);
+                Sound bip = new Sound(Assets.SFX_SHOOT);
+                bip.Volume = 0.9f;
+                bip.Play();
+
+                mySpeed.X -= shootAxis.X * 0.2f;
+                mySpeed.Y -= shootAxis.Y * 0.2f;
+
+            }
+        }
+
+        public void DropBombs()
+        {
+            Sound bip = new Sound(Assets.SFX_CHARGE);
+            bip.Volume = 0.9f;
+            bip.Play();
+
+            // Create 8 missiles
+            for (int i = 0; i < 8; i++)
+            {
+                Missile newMissile = new Missile(X, Y);
+                newMissile.Graphic.Angle = Rand.Float(0, 360);
+                this.Scene.Add(newMissile);
+            }
+            Global.Bombs--;
+        }
+
         public override void Update()
         {
             base.Update();
 
             // Input & Movement
-
-            mySpeed.X += Global.theController.LeftStick.X * 0.1f;
-            mySpeed.Y += Global.theController.LeftStick.Y * 0.1f;
-
-            mySpeed.Max = (Global.Score / 50) * 1.0f;
-            
-            if(Global.theController.LeftStick.Neutral)
+            if (!Impostor)
             {
-                mySpeed.X *= 0.95f;
-                mySpeed.Y *= 0.95f;
+                HandleInput();
+            }
+            else
+            {
+                HandleImpostorInput();
             }
 
             X += mySpeed.X;
@@ -92,44 +191,6 @@ namespace CaffieneJam
             {
                 RefireTime--;
             }
-
-            // Shoot stars
-            if((Global.theController.RightStick.Position.Length > 0.9) && RefireTime <= 0.0 && hurtTime <= 0.0)
-            {
-                RefireTime = MaxRefire;
-      
-
-                float XSpeedOfStar = 4.0f * Global.theController.RightStick.X;
-                float YSpeedOfStar = 4.0f * Global.theController.RightStick.Y;
-
-                Star newStar = new Star(X, Y, XSpeedOfStar, YSpeedOfStar);
-                this.Scene.Add(newStar);
-                Sound bip = new Sound(Assets.SFX_SHOOT);
-                bip.Volume = 0.9f;
-                bip.Play();
-
-                mySpeed.X -= Global.theController.RightStick.X * 0.2f;
-                mySpeed.Y -= Global.theController.RightStick.Y * 0.2f;
-
-            }
-
-            if((Global.theController.B.Pressed && Global.Bombs > 0))
-            {
-                Sound bip = new Sound(Assets.SFX_CHARGE);
-                bip.Volume = 0.9f;
-                bip.Play();
-
-                // Create 8 missiles
-                for(int i = 0; i < 8; i++)
-                {
-                    Missile newMissile = new Missile(X, Y);
-                    newMissile.Graphic.Angle = Rand.Float(0, 360);
-                    this.Scene.Add(newMissile);
-                }
-                Global.Bombs--;
-            }
-
-
 
             // Hit By Laser
             if (Collider.Overlap(X, Y, 3) && hurtTime <= 0.0f)

@@ -25,7 +25,7 @@ namespace CaffieneJam
 
 
 
-            Global.theGhost = new Ghost(100, 100);
+            Global.theGhost = new Ghost(100, 100, false);
 
             theFloor = new Floor();
             theFloor.gfx.Frame = 1;
@@ -36,6 +36,7 @@ namespace CaffieneJam
             Add(theFloor);
 
             Add(Global.theGhost);
+            Add(new Ghost(150, 150, true));
 
             ScoreText = new Text(((int)Global.Score).ToString() + "     B: " + Global.Bombs.ToString(), Assets.FONT, 16);
             
